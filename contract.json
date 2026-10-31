@@ -1,0 +1,16 @@
+{
+  "account": "••••1149",
+  "signed": "2026-09-24",
+  "loan_total": 2436343.00,
+  "loan_home": 2392808.00,
+  "loan_fire_insurance": 43535.00,
+  "term_years": 30,
+  "fixed_rate": 2.1,
+  "fixed_until": "2029-09-27",
+  "rate_after": "MRR - 1.75%",
+  "required_installments": [
+    { "from": 1, "to": 36, "amount": 7700.00 },
+    { "from": 37, "to": null, "amount": 13600.00 }
+  ],
+  "source": "Hand-entered from the scanned contract PDF (pages 1-3)."
+}

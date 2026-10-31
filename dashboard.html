@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SCB Home Loan</title>
+<style>
+  :root {
+    --plane: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: #e1e0d9;
+    --s1: #2a78d6; --s2: #eb6834; --good: #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --plane: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: #2c2c2a;
+      --s1: #3987e5; --s2: #d95926; --good: #0ca30c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--plane); color: var(--ink);
+         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "Sukhumvit Set", sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 20px 48px; }
+  h1 { font-size: 22px; margin: 0; }
+  .sub { color: var(--ink-2); margin: 4px 0 24px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .tile .label { color: var(--ink-2); font-size: 12px; }
+  .tile .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 4px; }
+  .tile .note { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .meter { height: 6px; background: var(--grid); border-radius: 3px; margin-top: 10px; overflow: hidden; }
+  .meter > div { height: 100%; background: var(--s1); }
+  .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  h2 { font-size: 14px; margin: 0 0 2px; }
+  .chart-sub { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); margin-bottom: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  svg text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .hit { fill: transparent; cursor: default; }
+  #tip { position: fixed; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+         border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.12);
+         display: none; font-variant-numeric: tabular-nums; z-index: 10; }
+  #tip b { display: block; margin-bottom: 4px; }
+  #tip i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--ink-2); font-weight: 500; font-size: 12px; }
+  th:first-child, td:first-child { text-align: left; }
+  .table-wrap { overflow-x: auto; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 24px; color: var(--ink-2); }
+  .facts b { color: var(--ink); font-weight: 500; }
+  .err { color: #e34948; }
+</style>
+</head>
+<body>
+<main>
+  <h1>SCB Home Loan</h1>
+  <div class="sub" id="sub"></div>
+  <section class="tiles" id="tiles"></section>
+  <section class="charts">
+    <div class="card">
+      <h2>Monthly payment split</h2>
+      <div class="chart-sub">Baht per receipt</div>
+      <div class="legend"><span><i style="background:var(--s1)"></i>Principal</span><span><i style="background:var(--s2)"></i>Interest</span></div>
+      <svg id="bars"></svg>
+    </div>
+    <div class="card">
+      <h2>Outstanding balance</h2>
+      <div class="chart-sub">Principal left after each payment</div>
+      <svg id="line"></svg>
+    </div>
+  </section>
+  <section class="card" style="margin-bottom:16px">
+    <h2 style="margin-bottom:10px">Contract</h2>
+    <div class="facts" id="facts"></div>
+  </section>
+  <section class="card">
+    <h2 style="margin-bottom:10px">All receipts</h2>
+    <div class="table-wrap"><table id="table"></table></div>
+  </section>
+</main>
+<div id="tip"></div>
+<script>
+const thb = (n, d = 0) => "฿" + n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const monthLabel = m => new Date(m + "-01").toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+const addMonths = (date, n) => { const d = new Date(date); d.setMonth(d.getMonth() + n); return d; };
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const tip = document.getElementById("tip");
+function showTip(evt, html) {
+  tip.innerHTML = html; tip.style.display = "block";
+  const x = Math.min(evt.clientX + 14, innerWidth - tip.offsetWidth - 8);
+  tip.style.left = x + "px"; tip.style.top = (evt.clientY + 14) + "px";
+}
+const hideTip = () => tip.style.display = "none";
+
+// Months to clear `balance` paying `payment` monthly at `ratePct` annual.
+function monthsToPayoff(balance, payment, ratePct) {
+  const r = ratePct / 100 / 12;
+  return Math.ceil(-Math.log(1 - r * balance / payment) / Math.log(1 + r));
+}
+
+function niceMax(v) {
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  return [1, 2, 2.5, 5, 10].map(s => s * p).find(s => s >= v);
+}
+
+function axes(svg, W, H, pad, max, fmt) {
+  // 2.5x / 5x maxima split evenly into 5 ticks; everything else into 4.
+  const lead = max / Math.pow(10, Math.floor(Math.log10(max))), n = lead === 2.5 || lead === 5 ? 5 : 4;
+  for (let i = 0; i <= n; i++) {
+    const v = max * i / n, y = H - pad.b - (H - pad.t - pad.b) * i / n;
+    el("line", { x1: pad.l, x2: W - pad.r, y1: y, y2: y, stroke: i ? "var(--grid)" : "var(--axis)" }, svg);
+    el("text", { x: pad.l - 6, y: y + 4, "text-anchor": "end" }, svg).textContent = fmt(v);
+  }
+}
+
+function drawBars(rows) {
+  const svg = document.getElementById("bars"), W = 480, H = 240, pad = { t: 10, r: 10, b: 26, l: 56 };
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const max = niceMax(Math.max(...rows.map(r => r.paid)));
+  axes(svg, W, H, pad, max, v => (v / 1000) + "k");
+  const plotW = W - pad.l - pad.r, slot = plotW / Math.max(rows.length, 6), bw = Math.min(slot * 0.6, 36);
+  const y = v => (H - pad.t - pad.b) * v / max;
+  rows.forEach((r, i) => {
+    const x = pad.l + slot * i + (slot - bw) / 2, base = H - pad.b;
+    el("rect", { x, y: base - y(r.principal), width: bw, height: y(r.principal), fill: "var(--s1)" }, svg);
+    el("rect", { x, y: base - y(r.principal) - y(r.interest), width: bw, height: y(r.interest), fill: "var(--s2)",
+                 stroke: "var(--surface)", "stroke-width": 1 }, svg);
+    el("text", { x: x + bw / 2, y: H - 8, "text-anchor": "middle" }, svg).textContent = monthLabel(r.month);
+    const hit = el("rect", { x: pad.l + slot * i, y: pad.t, width: slot, height: H - pad.t - pad.b, class: "hit" }, svg);
+    hit.addEventListener("mousemove", e => showTip(e, `<b>${monthLabel(r.month)}</b>
+      <i style="background:var(--s1)"></i>Principal ${thb(r.principal, 2)}<br>
+      <i style="background:var(--s2)"></i>Interest ${thb(r.interest, 2)}<br>Total ${thb(r.paid, 2)}`));
+    hit.addEventListener("mouseleave", hideTip);
+  });
+}
+
+function drawLine(rows, start) {
+  const svg = document.getElementById("line"), W = 480, H = 240, pad = { t: 10, r: 14, b: 26, l: 56 };
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const pts = [{ month: "start", label: "Loan start", balance: start }, ...rows.map(r => ({ ...r, label: monthLabel(r.month) }))];
+  const max = niceMax(start);
+  axes(svg, W, H, pad, max, v => +(v / 1e6).toFixed(2) + "M");
+  const plotW = W - pad.l - pad.r, step = plotW / Math.max(pts.length - 1, 6);
+  const xy = (p, i) => [pad.l + step * i, H - pad.b - (H - pad.t - pad.b) * p.balance / max];
+  el("polyline", { points: pts.map((p, i) => xy(p, i).join(",")).join(" "), fill: "none", stroke: "var(--s1)", "stroke-width": 2 }, svg);
+  pts.forEach((p, i) => {
+    const [x, yv] = xy(p, i);
+    el("circle", { cx: x, cy: yv, r: 3.5, fill: "var(--s1)", stroke: "var(--surface)", "stroke-width": 2 }, svg);
+    el("text", { x, y: H - 8, "text-anchor": "middle" }, svg).textContent = i ? monthLabel(p.month) : "Start";
+    const hit = el("rect", { x: x - step / 2, y: pad.t, width: step, height: H - pad.t - pad.b, class: "hit" }, svg);
+    hit.addEventListener("mousemove", e => showTip(e, `<b>${p.label}</b>Balance ${thb(p.balance, 2)}`));
+    hit.addEventListener("mouseleave", hideTip);
+  });
+}
+
+function render({ contract: c, receipts: rows }) {
+  const last = rows[rows.length - 1];
+  const sum = k => rows.reduce((s, r) => s + r[k], 0);
+  const paidOff = c.loan_total - last.balance;
+  const months = monthsToPayoff(last.balance, last.paid, last.rate);
+  const payoff = addMonths(last.date, months);
+  const contractEnd = addMonths(c.signed, c.term_years * 12);
+  const required = c.required_installments[0].amount;
+
+  document.getElementById("sub").textContent =
+    `Account ${c.account} · ${rows.length} receipt${rows.length > 1 ? "s" : ""} · latest ${new Date(last.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
+
+  const tiles = [
+    ["Outstanding balance", thb(last.balance), `of ${thb(c.loan_total)} borrowed`],
+    ["Principal paid off", (paidOff / c.loan_total * 100).toFixed(2) + "%", thb(paidOff, 2), paidOff / c.loan_total],
+    ["Total paid", thb(sum("paid")), `${thb(sum("interest"), 2)} of it interest`],
+    ["Monthly payment", thb(last.paid), `required ${thb(required)} · extra ${thb(last.paid - required)}`],
+    ["Payoff at this pace", payoff.toLocaleDateString("en-GB", { month: "short", year: "numeric" }),
+      `~${(months / 12).toFixed(1)} yrs vs contract ${contractEnd.getFullYear()} · assumes ${last.rate}%`],
+  ];
+  document.getElementById("tiles").innerHTML = tiles.map(([l, v, n, m]) => `
+    <div class="card tile"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${n}</div>
+    ${m !== undefined ? `<div class="meter"><div style="width:${Math.max(m * 100, 0.5)}%"></div></div>` : ""}</div>`).join("");
+
+  document.getElementById("facts").innerHTML = [
+    ["Signed", new Date(c.signed).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })],
+    ["Loan", `${thb(c.loan_total)} (home ${thb(c.loan_home)} + fire insurance ${thb(c.loan_fire_insurance)})`],
+    ["Term", `${c.term_years} years`],
+    ["Rate", `${c.fixed_rate}% fixed until ${new Date(c.fixed_until).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}, then ${c.rate_after}`],
+    ["Required installment", c.required_installments.map(i => `${thb(i.amount)} (#${i.from}${i.to ? "–" + i.to : "+"})`).join(", ")],
+  ].map(([k, v]) => `<div>${k}: <b>${v}</b></div>`).join("");
+
+  document.getElementById("table").innerHTML =
+    `<tr><th>Month</th><th>Date</th><th>Paid</th><th>Principal</th><th>Interest</th><th>Other</th><th>Balance</th><th>Rate</th></tr>` +
+    [...rows].reverse().map(r => `<tr><td>${monthLabel(r.month)}</td><td>${r.date}</td><td>${thb(r.paid, 2)}</td>
+      <td>${thb(r.principal, 2)}</td><td>${thb(r.interest, 2)}</td><td>${thb(r.other, 2)}</td>
+      <td>${thb(r.balance, 2)}</td><td>${r.rate}%</td></tr>`).join("");
+
+  drawBars(rows);
+  drawLine(rows, c.loan_total);
+}
+
+fetch("data.json").then(r => r.json()).then(render).catch(e => {
+  document.getElementById("sub").innerHTML = `<span class="err">Could not load data.json. Run <code>python3 extract.py</code> and serve with <code>python3 -m http.server</code>. (${e.message})</span>`;
+});
+</script>
+</body>
+</html>
