@@ -1,6 +1,5 @@
 .env
 receipts/
 contract/
-data.json
 __pycache__/
 .venv/

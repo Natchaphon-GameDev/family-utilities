@@ -40,7 +40,6 @@ def parse_receipt(path, password):
         "balance": balance,
         "balance_interest": balance_interest,
         "rate": rate,
-        "file": path.name,
     }
 
 

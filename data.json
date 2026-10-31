@@ -1,0 +1,39 @@
+{
+  "contract": {
+    "account": "••••1149",
+    "signed": "2026-09-24",
+    "loan_total": 2436343.0,
+    "loan_home": 2392808.0,
+    "loan_fire_insurance": 43535.0,
+    "term_years": 30,
+    "fixed_rate": 2.1,
+    "fixed_until": "2029-09-27",
+    "rate_after": "MRR - 1.75%",
+    "required_installments": [
+      {
+        "from": 1,
+        "to": 36,
+        "amount": 7700.0
+      },
+      {
+        "from": 37,
+        "to": null,
+        "amount": 13600.0
+      }
+    ],
+    "source": "Hand-entered from the scanned contract PDF (pages 1-3)."
+  },
+  "receipts": [
+    {
+      "month": "2026-10",
+      "date": "2026-10-28",
+      "paid": 20000.0,
+      "principal": 18375.16,
+      "interest": 1624.84,
+      "other": 0.0,
+      "balance": 2417967.84,
+      "balance_interest": 0.0,
+      "rate": 2.1
+    }
+  ]
+}
