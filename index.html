@@ -31,6 +31,13 @@
   .tile .note { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .meter { height: 6px; background: var(--grid); border-radius: 3px; margin-top: 10px; overflow: hidden; }
   .meter > div { height: 100%; background: var(--s1); }
+  .paid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 16px; padding: 20px; }
+  .paid .item { border-left: 4px solid; padding-left: 14px; }
+  .paid .label { color: var(--ink-2); font-size: 13px; }
+  .paid .value { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 2px 0; }
+  .paid .note { color: var(--muted); font-size: 12px; }
+  .split { grid-column: 1 / -1; display: flex; gap: 2px; height: 10px; }
+  .split > div { border-radius: 3px; }
   .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 12px; margin-bottom: 16px; }
   h2 { font-size: 14px; margin: 0 0 2px; }
   .chart-sub { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
@@ -58,6 +65,7 @@
 <main>
   <h1>SCB Home Loan</h1>
   <div class="sub" id="sub"></div>
+  <section class="card paid" id="paid"></section>
   <section class="tiles" id="tiles"></section>
   <section class="charts">
     <div class="card">
@@ -173,6 +181,15 @@ function render({ contract: c, receipts: rows }) {
 
   document.getElementById("sub").textContent =
     `Account ${c.account} · ${rows.length} receipt${rows.length > 1 ? "s" : ""} · latest ${new Date(last.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
+
+  const principal = sum("principal"), interest = sum("interest"), share = v => (v / (principal + interest) * 100).toFixed(1);
+  document.getElementById("paid").innerHTML = [
+    ["var(--s1)", "เงินต้นที่จ่ายไปแล้ว · Principal paid", principal, `${share(principal)}% of payments · ${(principal / c.loan_total * 100).toFixed(2)}% of the loan`],
+    ["var(--s2)", "ดอกเบี้ยที่จ่ายไปแล้ว · Interest paid", interest, `${share(interest)}% of payments`],
+  ].map(([color, l, v, n]) => `<div class="item" style="border-color:${color}">
+      <div class="label">${l}</div><div class="value">${thb(v, 2)}</div><div class="note">${n}</div></div>`).join("") +
+    `<div class="split" title="Principal ${share(principal)}% · Interest ${share(interest)}%">
+      <div style="flex:${principal};background:var(--s1)"></div><div style="flex:${interest};background:var(--s2)"></div></div>`;
 
   const tiles = [
     ["Outstanding balance", thb(last.balance), `of ${thb(c.loan_total)} borrowed`],
