@@ -23,6 +23,7 @@ def parse_receipt(path, password):
 
     day, month, year = re.search(r"\(Date\)\s+(\d{2})/(\d{2})/(\d{4})", text).groups()
     rate = float(re.search(r"\(Interest Rate\)\s+([\d.]+)%", text).group(1))
+    receipt_no = re.search(r"\(No\.\)\s+(\d+)", text).group(1)
     # After "บาท (Baht)": paid principal, paid interest, balance principal, balance interest.
     paid_principal, paid_interest, balance, balance_interest = map(
         money, re.search(r"\(Baht\)\s+" + r"\s+".join([NUM] * 4), text).groups()
@@ -32,6 +33,7 @@ def parse_receipt(path, password):
     return {
         "month": f"{year}-{month}",
         "date": f"{year}-{month}-{day}",
+        "no": receipt_no,
         "paid": total,
         "principal": paid_principal,
         "interest": paid_interest,
@@ -47,18 +49,19 @@ def main():
     load_dotenv(ROOT / ".env")
     password = os.environ["SCB_PDF_PASSWORD"]
 
-    by_month = {}
+    # Several receipts can share a month (SCB splits payments); keep each one, dedupe by receipt number.
+    by_no = {}
     for path in sorted((ROOT / "receipts").glob("*.[pP][dD][fF]")):
         r = parse_receipt(path, password)
-        by_month[r["month"]] = r
-    receipts = [by_month[m] for m in sorted(by_month)]
+        by_no[r["no"]] = r
+    receipts = sorted(by_no.values(), key=lambda r: (r["date"], r["no"]))
 
     contract = json.loads((ROOT / "contract.json").read_text())
     (ROOT / "data.json").write_text(
         json.dumps({"contract": contract, "receipts": receipts}, ensure_ascii=False, indent=2)
     )
     for r in receipts:
-        print(f"{r['month']}  paid {r['paid']:>12,.2f}  principal {r['principal']:>12,.2f}  "
+        print(f"{r['date']}  #{r['no'][-3:]}  paid {r['paid']:>12,.2f}  principal {r['principal']:>12,.2f}  "
               f"interest {r['interest']:>10,.2f}  balance {r['balance']:>14,.2f}  rate {r['rate']}%")
     print(f"{len(receipts)} receipt(s) -> data.json")
 

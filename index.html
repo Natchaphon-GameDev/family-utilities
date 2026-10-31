@@ -70,7 +70,7 @@
   <section class="charts">
     <div class="card">
       <h2>Monthly payment split</h2>
-      <div class="chart-sub">Baht per receipt</div>
+      <div class="chart-sub">Baht per month, all receipts summed</div>
       <div class="legend"><span><i style="background:var(--s1)"></i>Principal</span><span><i style="background:var(--s2)"></i>Interest</span></div>
       <svg id="bars"></svg>
     </div>
@@ -170,7 +170,19 @@ function drawLine(rows, start) {
   });
 }
 
-function render({ contract: c, receipts: rows }) {
+// SCB can issue several receipts in one month; sum the amounts, keep the last balance and rate.
+function byMonth(rows) {
+  const months = {};
+  for (const r of rows) {
+    const m = months[r.month] ??= { month: r.month, paid: 0, principal: 0, interest: 0, other: 0 };
+    for (const k of ["paid", "principal", "interest", "other"]) m[k] += r[k];
+    Object.assign(m, { date: r.date, balance: r.balance, rate: r.rate });
+  }
+  return Object.values(months);
+}
+
+function render({ contract: c, receipts }) {
+  const rows = byMonth(receipts);
   const last = rows[rows.length - 1];
   const sum = k => rows.reduce((s, r) => s + r[k], 0);
   const paidOff = c.loan_total - last.balance;
@@ -180,7 +192,7 @@ function render({ contract: c, receipts: rows }) {
   const required = c.required_installments[0].amount;
 
   document.getElementById("sub").textContent =
-    `Account ${c.account} · ${rows.length} receipt${rows.length > 1 ? "s" : ""} · latest ${new Date(last.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
+    `Account ${c.account} · ${receipts.length} receipt${receipts.length > 1 ? "s" : ""} · latest ${new Date(last.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
 
   const principal = sum("principal"), interest = sum("interest"), share = v => (v / (principal + interest) * 100).toFixed(1);
   document.getElementById("paid").innerHTML = [
@@ -195,9 +207,9 @@ function render({ contract: c, receipts: rows }) {
     ["Outstanding balance", thb(last.balance), `of ${thb(c.loan_total)} borrowed`],
     ["Principal paid off", (paidOff / c.loan_total * 100).toFixed(2) + "%", thb(paidOff, 2), paidOff / c.loan_total],
     ["Total paid", thb(sum("paid")), `${thb(sum("interest"), 2)} of it interest`],
-    ["Monthly payment", thb(last.paid), `required ${thb(required)} · extra ${thb(last.paid - required)}`],
+    ["Paid this month", thb(last.paid), `required ${thb(required)} · extra ${thb(last.paid - required)}`],
     ["Payoff at this pace", payoff.toLocaleDateString("en-GB", { month: "short", year: "numeric" }),
-      `~${(months / 12).toFixed(1)} yrs vs contract ${contractEnd.getFullYear()} · assumes ${last.rate}%`],
+      `~${(months / 12).toFixed(1)} yrs vs contract ${contractEnd.getFullYear()} · assumes ${thb(last.paid)}/mo at ${last.rate}%`],
   ];
   document.getElementById("tiles").innerHTML = tiles.map(([l, v, n, m]) => `
     <div class="card tile"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${n}</div>
@@ -212,8 +224,8 @@ function render({ contract: c, receipts: rows }) {
   ].map(([k, v]) => `<div>${k}: <b>${v}</b></div>`).join("");
 
   document.getElementById("table").innerHTML =
-    `<tr><th>Month</th><th>Date</th><th>Paid</th><th>Principal</th><th>Interest</th><th>Other</th><th>Balance</th><th>Rate</th></tr>` +
-    [...rows].reverse().map(r => `<tr><td>${monthLabel(r.month)}</td><td>${r.date}</td><td>${thb(r.paid, 2)}</td>
+    `<tr><th>Date</th><th>Receipt no.</th><th>Paid</th><th>Principal</th><th>Interest</th><th>Other</th><th>Balance</th><th>Rate</th></tr>` +
+    [...receipts].reverse().map(r => `<tr><td>${r.date}</td><td>${r.no}</td><td>${thb(r.paid, 2)}</td>
       <td>${thb(r.principal, 2)}</td><td>${thb(r.interest, 2)}</td><td>${thb(r.other, 2)}</td>
       <td>${thb(r.balance, 2)}</td><td>${r.rate}%</td></tr>`).join("");
 

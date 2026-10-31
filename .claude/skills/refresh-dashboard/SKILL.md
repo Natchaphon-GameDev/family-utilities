@@ -15,7 +15,7 @@ Search with `search_threads` (all time, `pageSize` 50, follow `pageToken`):
 (from:narongsi@greenspot.co.th OR from:SCBMG.eMaildocument@email.scb.co.th) subject:"SCB Home Loan" has:attachment
 ```
 
-For each thread, call `get_thread` with `messageFormat: MINIMAL`, and use `METADATA_ONLY` if attachments are missing. Collect the attachment filenames (`MG-...-E-YYYYMMDD.PDF`) and the `viewUrl`. Dad often forwards the same receipt more than once, so dedupe by filename.
+For each thread, call `get_thread` with `messageFormat: PLAIN_TEXT`. `MINIMAL` and `METADATA_ONLY` leave out attachments. Collect the attachment filenames (`MG-...-E-YYYYMMDD.PDF`) and the `viewUrl`. SCB can send several receipts in one month (split payments), all with the same subject line, so check every thread's attachment filename. Two filenames are the same receipt only if they match exactly.
 
 Compare with `ls receipts/`. Only the filenames not already there are new. If nothing is new, skip to step 3: the script exits early if `data.json` is unchanged.
 
