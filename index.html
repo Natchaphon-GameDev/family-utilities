@@ -9,21 +9,27 @@
   :root {
     --plane: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
     --grid: #e1e0d9; --axis: #c3c2b7; --border: #e1e0d9;
-    --s1: #2a78d6; --s2: #eb6834; --s3: #8a5cd6; --good: #006300;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #8a5cd6; --good: #006300; --warn-bg: #fff4e5; --warn: #8a4b00;
   }
-  @media (prefers-color-scheme: dark) {
+  @media screen and (prefers-color-scheme: dark) {
     :root {
       --plane: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
       --grid: #2c2c2a; --axis: #383835; --border: #2c2c2a;
-      --s1: #3987e5; --s2: #d95926; --s3: #9a72e8; --good: #0ca30c;
+      --s1: #3987e5; --s2: #d95926; --s3: #9a72e8; --good: #0ca30c; --warn-bg: #2e2210; --warn: #f0b45c;
     }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--plane); color: var(--ink);
          font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "Sukhumvit Set", sans-serif; }
   main { max-width: 1040px; margin: 0 auto; padding: 32px 20px 48px; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .actions { display: flex; gap: 8px; }
+  button { font: inherit; font-size: 13px; color: var(--ink); background: var(--surface); border: 1px solid var(--border);
+           border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button:hover { border-color: var(--axis); }
   h1 { font-size: 22px; margin: 0; }
   .sub { color: var(--ink-2); margin: 4px 0 24px; }
+  .banner { background: var(--warn-bg); color: var(--warn); border-radius: 10px; padding: 12px 16px; margin: -8px 0 16px; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
   .tile .label { color: var(--ink-2); font-size: 12px; }
@@ -41,8 +47,10 @@
   .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 12px; margin-bottom: 16px; }
   h2 { font-size: 14px; margin: 0 0 2px; }
   .chart-sub { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
-  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); margin-bottom: 6px; }
+  .chart-note { color: var(--ink-2); font-size: 12px; margin-top: 8px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); margin-bottom: 6px; }
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .legend i.dash { height: 0; border-top: 2px dashed; border-radius: 0; vertical-align: 3px; }
   svg { display: block; width: 100%; height: auto; overflow: visible; }
   svg text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
   .hit { fill: transparent; cursor: default; }
@@ -55,6 +63,8 @@
   th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
   th { color: var(--ink-2); font-weight: 500; font-size: 12px; }
   th:first-child, td:first-child { text-align: left; }
+  td.bar { width: 35%; min-width: 80px; }
+  td.bar .meter { margin: 0; }
   .table-wrap { overflow-x: auto; }
   .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 24px; color: var(--ink-2); }
   .facts b { color: var(--ink); font-weight: 500; }
@@ -69,42 +79,138 @@
     /* Charts scale down with the viewBox, so bump label size to stay readable. */
     svg text { font-size: 15px; }
   }
+  @media print {
+    .actions, .banner, #tip { display: none !important; }
+    body { background: #fff; }
+    main { padding: 0; }
+    .card { break-inside: avoid; }
+  }
 </style>
 </head>
 <body>
 <main>
-  <h1>SCB Home Loan</h1>
+  <header>
+    <h1 data-t="title"></h1>
+    <div class="actions"><button id="lang"></button><button id="print" data-t="print"></button></div>
+  </header>
   <div class="sub" id="sub"></div>
+  <div class="banner" id="banner" hidden></div>
   <section class="card paid" id="paid"></section>
   <section class="tiles" id="tiles"></section>
   <section class="charts">
     <div class="card">
-      <h2>Monthly payment split</h2>
-      <div class="chart-sub">Baht per month, all receipts summed</div>
-      <div class="legend"><span><i style="background:var(--s1)"></i>Principal</span><span><i style="background:var(--s2)"></i>Interest</span><span id="legend-other" hidden><i style="background:var(--s3)"></i>Other</span></div>
+      <h2 data-t="barsTitle"></h2>
+      <div class="chart-sub" data-t="barsSub"></div>
+      <div class="legend" id="legend-bars"></div>
       <svg id="bars" role="img"></svg>
     </div>
     <div class="card">
-      <h2>Outstanding balance</h2>
-      <div class="chart-sub">Principal left after each payment</div>
+      <h2 data-t="lineTitle"></h2>
+      <div class="chart-sub" data-t="lineSub"></div>
       <svg id="line" role="img"></svg>
+    </div>
+    <div class="card">
+      <h2 data-t="projTitle"></h2>
+      <div class="chart-sub" data-t="projSub"></div>
+      <div class="legend" id="legend-proj"></div>
+      <svg id="proj" role="img"></svg>
+      <div class="chart-note" id="proj-note"></div>
+    </div>
+    <div class="card">
+      <h2 data-t="taxTitle"></h2>
+      <div class="chart-sub" data-t="taxSub"></div>
+      <div class="table-wrap"><table id="tax"></table></div>
     </div>
   </section>
   <section class="card" style="margin-bottom:16px">
-    <h2 style="margin-bottom:10px">Contract</h2>
+    <h2 style="margin-bottom:10px" data-t="contract"></h2>
     <div class="facts" id="facts"></div>
   </section>
   <section class="card">
-    <h2 style="margin-bottom:10px">All receipts</h2>
+    <h2 style="margin-bottom:10px" data-t="receipts"></h2>
     <div class="table-wrap"><table id="table"></table></div>
   </section>
 </main>
 <div id="tip"></div>
 <script>
+const L = {
+  en: {
+    title: "SCB Home Loan", print: "Print", switchTo: "ไทย",
+    sub: (acct, n, d) => `Account ${acct} · ${n} receipt${n > 1 ? "s" : ""} · latest ${d}`,
+    missing: (m, d) => `No receipt for ${m} yet. The latest one is from ${d}. Check that it was forwarded, then refresh the dashboard.`,
+    principalPaid: "Principal paid", interestPaid: "Interest paid",
+    ofPayments: p => `${p}% of payments`, ofLoan: p => `${p}% of the loan`,
+    balance: "Outstanding balance", balanceNote: (x, p, total) => `${x} paid off · ${p}% of ${total}`,
+    totalPaid: "Total paid", totalNote: i => `${i} of it interest`,
+    paidIn: m => `Paid in ${m}`, installment: (n, r) => `installment #${n} · required ${r}`, extra: x => `extra ${x}`, short: x => `short ${x}`,
+    payoff: "Payoff at this pace", payoffNote: (y, end, extra, rate) => `~${y} yrs vs contract ${end} · required + ${extra}/mo average extra, ${rate}% throughout`,
+    never: rate => `At this pace the loan does not clear at ${rate}%`,
+    fixedUntil: "Fixed rate until", fixedNote: (r, n, after) => `${r}% for ${n} more months, then ${after}`, fixedNow: after => `now ${after}`,
+    barsTitle: "Monthly payment split", barsSub: "Baht per month, all receipts summed",
+    principal: "Principal", interest: "Interest", other: "Other", total: "Total",
+    barsAria: (n, m, x) => `Monthly payments over ${n} month(s); ${m}: ${x}`,
+    lineTitle: "Outstanding balance", lineSub: "Principal left after each payment",
+    start: "Start", loanStart: "Loan start", balanceTip: "Balance",
+    lineAria: (a, b) => `Outstanding balance from ${a} down to ${b}`,
+    projTitle: "Payoff projection", projSub: "Estimated at today's rate. SCB charges interest daily, so real figures drift a little.",
+    actual: "Actual", atPace: extra => `At your pace (required + ${extra}/mo)`, requiredOnly: "Required installments only",
+    projPace: (extra, d, a) => `Required + ${extra}/mo: paid off ${d}, total interest ≈ ${a}`,
+    projNever: () => "At your pace the loan never clears",
+    projBase: (d, b) => `Required installments only: ${d}, ≈ ${b}`,
+    projSave: (s, y) => `Paying extra saves ≈ ${s} and ${y} years`,
+    projAria: d => `Projected payoff ${d}`,
+    taxTitle: "Tax deduction · home-loan interest",
+    taxSub: "Interest paid per calendar year. Deductible up to ฿100,000 a year, shared between co-borrowers.",
+    year: "Year", deductible: "Deductible", soFar: "so far",
+    contract: "Contract", signed: "Signed", loan: "Loan", loanParts: (t, h, f) => `${t} (home ${h} + fire insurance ${f})`,
+    term: "Term", years: n => `${n} years`, rate: "Rate", rateText: (r, d, after) => `${r}% fixed until ${d}, then ${after}`,
+    required: "Required installment", tier: (a, from, to) => `${a} (#${from}${to ? "–" + to : "+"})`,
+    receipts: "All receipts", date: "Date", receiptNo: "Receipt no.", paid: "Paid", balanceCol: "Balance", rateCol: "Rate",
+  },
+  th: {
+    title: "สินเชื่อบ้าน SCB", print: "พิมพ์", switchTo: "English",
+    sub: (acct, n, d) => `บัญชี ${acct} · ใบเสร็จ ${n} ใบ · ล่าสุด ${d}`,
+    missing: (m, d) => `ยังไม่มีใบเสร็จเดือน ${m} ใบล่าสุดลงวันที่ ${d} ลองเช็กว่าส่งต่ออีเมลมาแล้วหรือยัง แล้วค่อยอัปเดตหน้านี้`,
+    principalPaid: "เงินต้นที่จ่ายไปแล้ว", interestPaid: "ดอกเบี้ยที่จ่ายไปแล้ว",
+    ofPayments: p => `${p}% ของยอดที่จ่าย`, ofLoan: p => `${p}% ของวงเงินกู้`,
+    balance: "เงินต้นคงเหลือ", balanceNote: (x, p, total) => `จ่ายแล้ว ${x} · ${p}% ของ ${total}`,
+    totalPaid: "ยอดจ่ายรวม", totalNote: i => `เป็นดอกเบี้ย ${i}`,
+    paidIn: m => `ยอดจ่าย ${m}`, installment: (n, r) => `งวดที่ ${n} · ขั้นต่ำ ${r}`, extra: x => `จ่ายเกิน ${x}`, short: x => `ขาด ${x}`,
+    payoff: "ปิดหนี้ได้ (ตามที่จ่ายอยู่)", payoffNote: (y, end, extra, rate) => `~${y} ปี (สัญญาถึง ${end}) · ขั้นต่ำ + จ่ายเกินเฉลี่ย ${extra}/เดือน ดอกเบี้ย ${rate}% ตลอด`,
+    never: rate => `ถ้าจ่ายแบบนี้ ปิดหนี้ไม่ได้ที่ดอกเบี้ย ${rate}%`,
+    fixedUntil: "ดอกเบี้ยคงที่ถึง", fixedNote: (r, n, after) => `${r}% อีก ${n} เดือน จากนั้น ${after}`, fixedNow: after => `ตอนนี้ ${after}`,
+    barsTitle: "ยอดจ่ายรายเดือน", barsSub: "บาทต่อเดือน รวมทุกใบเสร็จ",
+    principal: "เงินต้น", interest: "ดอกเบี้ย", other: "อื่นๆ", total: "รวม",
+    barsAria: (n, m, x) => `ยอดจ่าย ${n} เดือน · ${m}: ${x}`,
+    lineTitle: "เงินต้นคงเหลือ", lineSub: "เงินต้นที่เหลือหลังจ่ายแต่ละครั้ง",
+    start: "เริ่ม", loanStart: "เริ่มกู้", balanceTip: "คงเหลือ",
+    lineAria: (a, b) => `เงินต้นคงเหลือจาก ${a} เหลือ ${b}`,
+    projTitle: "ประมาณการปิดหนี้", projSub: "คำนวณที่ดอกเบี้ยปัจจุบัน ธนาคารคิดดอกเบี้ยรายวัน ตัวเลขจริงจึงต่างไปเล็กน้อย",
+    actual: "จ่ายจริง", atPace: extra => `ตามที่จ่ายอยู่ (ขั้นต่ำ + ${extra}/เดือน)`, requiredOnly: "จ่ายขั้นต่ำอย่างเดียว",
+    projPace: (extra, d, a) => `ขั้นต่ำ + ${extra}/เดือน: ปิดหนี้ ${d} ดอกเบี้ยรวม ≈ ${a}`,
+    projNever: () => "ถ้าจ่ายแบบนี้จะปิดหนี้ไม่ได้",
+    projBase: (d, b) => `จ่ายขั้นต่ำอย่างเดียว: ปิดหนี้ ${d} ดอกเบี้ยรวม ≈ ${b}`,
+    projSave: (s, y) => `จ่ายเพิ่มช่วยประหยัดดอกเบี้ย ≈ ${s} และปิดหนี้เร็วขึ้น ${y} ปี`,
+    projAria: d => `ประมาณการปิดหนี้ ${d}`,
+    taxTitle: "ลดหย่อนภาษี · ดอกเบี้ยเงินกู้ซื้อบ้าน",
+    taxSub: "ดอกเบี้ยที่จ่ายในแต่ละปีปฏิทิน ลดหย่อนได้ไม่เกิน ฿100,000 ต่อปี (ผู้กู้ร่วมหารเฉลี่ยกัน)",
+    year: "ปี", deductible: "ลดหย่อนได้", soFar: "ถึงตอนนี้",
+    contract: "สัญญา", signed: "วันทำสัญญา", loan: "วงเงินกู้", loanParts: (t, h, f) => `${t} (บ้าน ${h} + ประกันอัคคีภัย ${f})`,
+    term: "ระยะเวลา", years: n => `${n} ปี`, rate: "อัตราดอกเบี้ย", rateText: (r, d, after) => `คงที่ ${r}% ถึง ${d} จากนั้น ${after}`,
+    required: "ค่างวดขั้นต่ำ", tier: (a, from, to) => `${a} (งวด ${from}${to ? "–" + to : " ขึ้นไป"})`,
+    receipts: "ใบเสร็จทั้งหมด", date: "วันที่", receiptNo: "เลขที่ใบเสร็จ", paid: "ยอดจ่าย", balanceCol: "คงเหลือ", rateCol: "อัตรา",
+  },
+};
+let lang = localStorage.getItem("lang") || (navigator.language.startsWith("th") ? "th" : "en");
+const T = (k, ...a) => { const v = L[lang][k]; return typeof v === "function" ? v(...a) : v; };
+
 const thb = (n, d = 0) => "฿" + n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
-const fmtDate = (d, opts = { day: "numeric", month: "short", year: "numeric" }) => new Date(d).toLocaleDateString("en-GB", opts);
+// Thai dates use the Buddhist-era year (2569 = 2026), which is what Dad reads on bank papers.
+const fmtDate = (d, opts = { day: "numeric", month: "short", year: "numeric" }) =>
+  new Date(d).toLocaleDateString(lang === "th" ? "th-TH" : "en-GB", opts);
 const monthLabel = m => fmtDate(m + "-01", { month: "short", year: "numeric" });
 const shortMonth = m => fmtDate(m + "-01", { month: "short", year: "2-digit" });
+const yearLabel = d => d.getFullYear() + (lang === "th" ? 543 : 0);
 const addMonths = (date, n) => { const d = new Date(date); d.setMonth(d.getMonth() + n); return d; };
 // Whole months from a to b; both are "YYYY-MM..." strings.
 const monthsBetween = (a, b) => (b.slice(0, 4) - a.slice(0, 4)) * 12 + (b.slice(5, 7) - a.slice(5, 7));
@@ -133,11 +239,22 @@ function hover(hit, html) {
 document.addEventListener("pointerdown", e => { if (!e.target.closest(".hit")) hideTip(); });
 addEventListener("scroll", hideTip, { passive: true });
 
-// Months to clear `balance` paying `payment` monthly at `ratePct` annual. Infinity if it never clears.
-function monthsToPayoff(balance, payment, ratePct) {
-  const r = ratePct / 100 / 12;
-  if (payment <= balance * r) return Infinity;
-  return Math.ceil(-Math.log(1 - r * balance / payment) / Math.log(1 + r));
+// Required installment for installment number n (#1 is the month after signing).
+const requiredFor = (c, n) => (c.required_installments.find(t => t.from <= n && (t.to == null || n <= t.to))
+  ?? c.required_installments[0]).amount;
+
+// Month-by-month balance at a flat annual rate; payment(n) is the n-th month's payment.
+// Stops when paid off, or after 50 years with months = Infinity if it never clears.
+function project(balance, ratePct, payment) {
+  const r = ratePct / 100 / 12, balances = [balance];
+  let interest = 0;
+  while (balance > 0.005 && balances.length <= 600) {
+    const i = balance * r;
+    interest += i;
+    balance -= Math.min(payment(balances.length), balance + i) - i;
+    balances.push(Math.max(balance, 0));
+  }
+  return { balances, interest, months: balance > 0.005 ? Infinity : balances.length - 1 };
 }
 
 // Round [lo, hi] out to a 1/2/2.5/5 x 10^k step that gives about 4 ticks.
@@ -156,20 +273,33 @@ function axes(svg, W, H, pad, { min, max, step }, fmt) {
   }
 }
 
-function drawBars(rows) {
-  const svg = document.getElementById("bars"), W = 480, H = 240, pad = { t: 10, r: 10, b: 26, l: 56 };
+// Clear an SVG chart and size it; charts are redrawn when the language changes.
+function chart(id, W, H) {
+  const svg = document.getElementById(id);
+  svg.innerHTML = "";
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  return svg;
+}
+
+const legend = items => items.map(([label, color, dash]) =>
+  `<span><i class="${dash ? "dash" : ""}" style="${dash ? "border-color" : "background"}:${color}"></i>${label}</span>`).join("");
+
+function drawBars(rows) {
+  const W = 480, H = 240, pad = { t: 10, r: 10, b: 26, l: 56 }, svg = chart("bars", W, H);
   const last = rows[rows.length - 1];
-  svg.setAttribute("aria-label", `Monthly payments over ${rows.length} month(s); ${monthLabel(last.month)}: ${thb(last.paid)}`);
+  svg.setAttribute("aria-label", T("barsAria", rows.length, monthLabel(last.month), thb(last.paid)));
   const d = niceDomain(0, Math.max(...rows.map(r => r.paid)));
   axes(svg, W, H, pad, d, v => (v / 1000) + "k");
   const plotW = W - pad.l - pad.r, slot = plotW / Math.max(rows.length, 6), bw = Math.min(slot * 0.6, 36);
   const y = v => (H - pad.t - pad.b) * v / d.max;
-  const parts = [["principal", "Principal", "var(--s1)"], ["interest", "Interest", "var(--s2)"], ["other", "Other", "var(--s3)"]];
+  const parts = [["principal", "var(--s1)"], ["interest", "var(--s2)"], ["other", "var(--s3)"]];
+  // Fees and insurance have been zero so far; only show Other once one turns up.
+  const hasOther = rows.some(r => r.other);
+  document.getElementById("legend-bars").innerHTML = legend(parts.filter(([k]) => k !== "other" || hasOther).map(([k, c]) => [T(k), c]));
   rows.forEach((r, i) => {
     const x = pad.l + slot * i + (slot - bw) / 2;
     let top = H - pad.b;
-    parts.forEach(([k, , fill], j) => {
+    parts.forEach(([k, fill], j) => {
       if (!r[k]) return;
       top -= y(r[k]);
       el("rect", { x, y: top, width: bw, height: y(r[k]), fill, ...(j && { stroke: "var(--surface)", "stroke-width": 1 }) }, svg);
@@ -178,16 +308,15 @@ function drawBars(rows) {
       el("text", { x: x + bw / 2, y: H - 8, "text-anchor": "middle" }, svg).textContent = shortMonth(r.month);
     const hit = el("rect", { x: pad.l + slot * i, y: pad.t, width: slot, height: H - pad.t - pad.b, class: "hit" }, svg);
     hover(hit, `<b>${monthLabel(r.month)}</b>` +
-      parts.filter(([k]) => k !== "other" || r.other).map(([k, l, c]) => `<i style="background:${c}"></i>${l} ${thb(r[k], 2)}<br>`).join("") +
-      `Total ${thb(r.paid, 2)}`);
+      parts.filter(([k]) => k !== "other" || r.other).map(([k, c]) => `<i style="background:${c}"></i>${T(k)} ${thb(r[k], 2)}<br>`).join("") +
+      `${T("total")} ${thb(r.paid, 2)}`);
   });
 }
 
 function drawLine(rows, start) {
-  const svg = document.getElementById("line"), W = 480, H = 240, pad = { t: 10, r: 14, b: 26, l: 56 };
-  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  const pts = [{ month: "start", label: "Loan start", balance: start }, ...rows.map(r => ({ ...r, label: monthLabel(r.month) }))];
-  svg.setAttribute("aria-label", `Outstanding balance from ${thb(start)} down to ${thb(pts[pts.length - 1].balance)}`);
+  const W = 480, H = 240, pad = { t: 10, r: 14, b: 26, l: 56 }, svg = chart("line", W, H);
+  const pts = [{ month: "start", label: T("loanStart"), balance: start }, ...rows.map(r => ({ ...r, label: monthLabel(r.month) }))];
+  svg.setAttribute("aria-label", T("lineAria", thb(start), thb(pts[pts.length - 1].balance)));
   // Not zero-based: early on the drop is tiny next to the loan, so the axis zooms in on the range actually covered.
   const d = niceDomain(Math.min(...pts.map(p => p.balance)), start);
   axes(svg, W, H, pad, d, v => +(v / 1e6).toFixed(4) + "M");
@@ -199,10 +328,148 @@ function drawLine(rows, start) {
     if (pts.length <= 24 || i === pts.length - 1)
       el("circle", { cx: x, cy: yv, r: 3.5, fill: "var(--s1)", stroke: "var(--surface)", "stroke-width": 2 }, svg);
     if (showLabel(i, pts.length))
-      el("text", { x, y: H - 8, "text-anchor": "middle" }, svg).textContent = i ? shortMonth(p.month) : "Start";
+      el("text", { x, y: H - 8, "text-anchor": "middle" }, svg).textContent = i ? shortMonth(p.month) : T("start");
     const hit = el("rect", { x: x - step / 2, y: pad.t, width: step, height: H - pad.t - pad.b, class: "hit" }, svg);
-    hover(hit, `<b>${p.label}</b>Balance ${thb(p.balance, 2)}`);
+    hover(hit, `<b>${p.label}</b>${T("balanceTip")} ${thb(p.balance, 2)}`);
   });
+}
+
+// Whole loan on a month axis from signing: actual balances, the projection at the current pace, and the
+// contract baseline of paying only the required installments.
+function drawProjection(c, rows, pace, base, extraLabel) {
+  const W = 480, H = 240, pad = { t: 10, r: 14, b: 26, l: 56 }, svg = chart("proj", W, H);
+  const now = monthsBetween(c.signed, rows[rows.length - 1].month);
+  const actual = [[0, c.loan_total], ...rows.map(r => [monthsBetween(c.signed, r.month), r.balance])];
+  const ahead = isFinite(pace.months) ? pace.balances.map((b, i) => [now + i, b]) : [];
+  const req = base.balances.map((b, i) => [i, b]);
+  const end = Math.max(req.length, ahead.length ? now + ahead.length : 0) - 1;
+  const d = niceDomain(0, c.loan_total);
+  axes(svg, W, H, pad, d, v => v ? v / 1e6 + "M" : "0");
+  const x = m => pad.l + (W - pad.l - pad.r) * m / end, y = v => H - pad.b - (H - pad.t - pad.b) * v / d.max;
+  const line = (pts, stroke, dash) => el("polyline", { points: pts.map(([m, v]) => x(m) + "," + y(v)).join(" "),
+    fill: "none", stroke, "stroke-width": 2, ...(dash && { "stroke-dasharray": "5 4" }) }, svg);
+  line(req, "var(--muted)", true);
+  if (ahead.length) line(ahead, "var(--s1)", true);
+  line(actual, "var(--s1)");
+
+  const every = Math.ceil(end / 12 / 6);
+  for (let k = 0; k * 12 <= end; k += every)
+    el("text", { x: x(k * 12), y: H - 8, "text-anchor": "middle" }, svg).textContent = yearLabel(addMonths(c.signed, k * 12));
+  // One hover band per loan year, reporting balances at the end of it.
+  const at = (pts, m) => [...pts].reverse().find(([pm]) => pm <= m)?.[1];
+  for (let m0 = 0; m0 < end; m0 += 12) {
+    const m1 = Math.min(m0 + 12, end), mine = m1 <= now ? [T("actual"), at(actual, m1)] : [T("atPace", extraLabel), at(ahead, m1)];
+    const hit = el("rect", { x: x(m0), y: pad.t, width: x(m1) - x(m0), height: H - pad.t - pad.b, class: "hit" }, svg);
+    hover(hit, `<b>${fmtDate(addMonths(c.signed, m1), { month: "short", year: "numeric" })}</b>` +
+      (mine[1] !== undefined ? `<i style="background:var(--s1)"></i>${mine[0]} ${thb(mine[1])}<br>` : "") +
+      `<i style="background:var(--muted)"></i>${T("requiredOnly")} ${thb(at(req, m1) ?? 0)}`);
+  }
+
+  document.getElementById("legend-proj").innerHTML = legend([[T("actual"), "var(--s1)"], [T("atPace", extraLabel), "var(--s1)", true],
+    [T("requiredOnly"), "var(--muted)", true]]);
+}
+
+function labels() {
+  document.documentElement.lang = lang;
+  document.title = T("title");
+  document.querySelectorAll("[data-t]").forEach(e => e.textContent = T(e.dataset.t));
+  document.getElementById("lang").textContent = T("switchTo");
+}
+
+function render({ contract: c, receipts }) {
+  labels();
+  const rows = byMonth(receipts);
+  const last = rows[rows.length - 1];
+  const sum = k => rows.reduce((s, r) => s + r[k], 0);
+  const paidOff = c.loan_total - last.balance;
+  const contractEnd = addMonths(c.signed, c.term_years * 12);
+  const installment = monthsBetween(c.signed, last.month);
+  const required = requiredFor(c, installment);
+  const extra = last.paid - required;
+  const fixedLeft = monthsBetween(new Date().toISOString(), c.fixed_until);
+  const monthYear = { month: "short", year: "numeric" };
+
+  // Pace = each future month's required installment plus the average extra paid on top of it so far,
+  // so the projection follows the contract's step-up from ฿7,700 to ฿13,600.
+  const avgExtra = rows.reduce((s, r) => s + r.principal + r.interest - requiredFor(c, monthsBetween(c.signed, r.month)), 0) / rows.length;
+  const extraLabel = (avgExtra < 0 ? "−" : "") + thb(Math.abs(avgExtra));
+  const pace = project(last.balance, last.rate, n => requiredFor(c, installment + n) + avgExtra);
+  const payoff = addMonths(last.date, pace.months);
+  const base = project(c.loan_total, c.fixed_rate, n => requiredFor(c, n));
+  const baseEnd = addMonths(c.signed, base.months);
+
+  document.getElementById("sub").textContent = T("sub", c.account, receipts.length, fmtDate(last.date));
+
+  // SCB debits on the 28th, so by the 5th of a month the previous month's receipt should have arrived.
+  const today = new Date(), due = addMonths(new Date(today.getFullYear(), today.getMonth(), 1), today.getDate() >= 5 ? -1 : -2);
+  const dueMonth = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}`;
+  const banner = document.getElementById("banner");
+  banner.hidden = last.month >= dueMonth;
+  banner.textContent = T("missing", monthLabel(dueMonth), fmtDate(last.date));
+
+  const principal = sum("principal"), interest = sum("interest"), share = v => (v / (principal + interest) * 100).toFixed(1);
+  document.getElementById("paid").innerHTML = [
+    ["var(--s1)", T("principalPaid"), principal, `${T("ofPayments", share(principal))} · ${T("ofLoan", (principal / c.loan_total * 100).toFixed(2))}`],
+    ["var(--s2)", T("interestPaid"), interest, T("ofPayments", share(interest))],
+  ].map(([color, l, v, n]) => `<div class="item" style="border-color:${color}">
+      <div class="label">${l}</div><div class="value">${thb(v, 2)}</div><div class="note">${n}</div></div>`).join("") +
+    `<div class="split" title="${T("principal")} ${share(principal)}% · ${T("interest")} ${share(interest)}%">
+      <div style="flex:${principal};background:var(--s1)"></div><div style="flex:${interest};background:var(--s2)"></div></div>`;
+
+  const tiles = [
+    [T("balance"), thb(last.balance), T("balanceNote", thb(paidOff), (paidOff / c.loan_total * 100).toFixed(2), thb(c.loan_total)), paidOff / c.loan_total],
+    [T("totalPaid"), thb(sum("paid")), T("totalNote", thb(sum("interest"), 2))],
+    [T("paidIn", monthLabel(last.month)), thb(last.paid),
+      `${T("installment", installment, thb(required))} · ${extra >= 0 ? T("extra", thb(extra)) : T("short", thb(-extra))}`],
+    isFinite(pace.months)
+      ? [T("payoff"), fmtDate(payoff, monthYear),
+          T("payoffNote", (pace.months / 12).toFixed(1), yearLabel(contractEnd), extraLabel, last.rate)]
+      : [T("payoff"), "—", T("never", last.rate)],
+    [T("fixedUntil"), fmtDate(c.fixed_until, monthYear),
+      fixedLeft > 0 ? T("fixedNote", c.fixed_rate, fixedLeft, c.rate_after) : T("fixedNow", c.rate_after)],
+  ];
+  document.getElementById("tiles").innerHTML = tiles.map(([l, v, n, m]) => `
+    <div class="card tile"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${n}</div>
+    ${m !== undefined ? `<div class="meter"><div style="width:${Math.max(m * 100, 0.5)}%"></div></div>` : ""}</div>`).join("");
+
+  // Lifetime interest on the actual path = paid so far + projected; compared against paying only what the contract requires.
+  const lifetime = interest + pace.interest, saved = base.interest - lifetime;
+  document.getElementById("proj-note").textContent = [
+    isFinite(pace.months) ? T("projPace", extraLabel, fmtDate(payoff, monthYear), thb(lifetime)) : T("projNever"),
+    T("projBase", fmtDate(baseEnd, monthYear), thb(base.interest)),
+    isFinite(pace.months) && saved > 0 ? T("projSave", thb(saved), ((base.months - installment - pace.months) / 12).toFixed(1)) : "",
+  ].filter(Boolean).join(" · ");
+  document.getElementById("proj").setAttribute("aria-label", T("projAria", isFinite(pace.months) ? fmtDate(payoff, monthYear) : "—"));
+
+  // Thai personal income tax: home-loan interest is deductible up to 100,000 baht per calendar year.
+  const CAP = 100000, byYear = {};
+  for (const r of receipts) byYear[r.date.slice(0, 4)] = (byYear[r.date.slice(0, 4)] ?? 0) + r.interest;
+  document.getElementById("tax").innerHTML =
+    `<tr><th>${T("year")}</th><th>${T("interest")}</th><th>${T("deductible")}</th><th></th></tr>` +
+    Object.entries(byYear).reverse().map(([y, v]) => `<tr>
+      <td>${yearLabel(new Date(+y, 0))}${+y === today.getFullYear() ? ` (${T("soFar")})` : ""}</td>
+      <td>${thb(v, 2)}</td><td>${thb(Math.min(v, CAP), 2)}</td>
+      <td class="bar"><div class="meter"><div style="width:${Math.max(Math.min(v / CAP, 1) * 100, 0.5)}%"></div></div></td></tr>`).join("");
+
+  document.getElementById("facts").innerHTML = [
+    [T("signed"), fmtDate(c.signed)],
+    [T("loan"), T("loanParts", thb(c.loan_total), thb(c.loan_home), thb(c.loan_fire_insurance))],
+    [T("term"), T("years", c.term_years)],
+    [T("rate"), T("rateText", c.fixed_rate, fmtDate(c.fixed_until, monthYear), c.rate_after)],
+    [T("required"), c.required_installments.map(i => T("tier", thb(i.amount), i.from, i.to)).join(", ")],
+  ].map(([k, v]) => `<div>${k}: <b>${v}</b></div>`).join("");
+
+  const hasOther = receipts.some(r => r.other);
+  document.getElementById("table").innerHTML =
+    `<tr><th>${T("date")}</th><th>${T("receiptNo")}</th><th>${T("paid")}</th><th>${T("principal")}</th><th>${T("interest")}</th>` +
+    `${hasOther ? `<th>${T("other")}</th>` : ""}<th>${T("balanceCol")}</th><th>${T("rateCol")}</th></tr>` +
+    [...receipts].reverse().map(r => `<tr><td>${fmtDate(r.date)}</td><td>${r.no}</td><td>${thb(r.paid, 2)}</td>
+      <td>${thb(r.principal, 2)}</td><td>${thb(r.interest, 2)}</td>${hasOther ? `<td>${thb(r.other, 2)}</td>` : ""}
+      <td>${thb(r.balance, 2)}</td><td>${r.rate}%</td></tr>`).join("");
+
+  drawBars(rows);
+  drawLine(rows, c.loan_total);
+  drawProjection(c, rows, pace, base, extraLabel);
 }
 
 // SCB can issue several receipts in one month; sum the amounts, keep the last balance and rate.
@@ -216,72 +483,16 @@ function byMonth(rows) {
   return Object.values(months);
 }
 
-function render({ contract: c, receipts }) {
-  const rows = byMonth(receipts);
-  const last = rows[rows.length - 1];
-  const sum = k => rows.reduce((s, r) => s + r[k], 0);
-  const paidOff = c.loan_total - last.balance;
-  const months = monthsToPayoff(last.balance, last.paid, last.rate);
-  const payoff = addMonths(last.date, months);
-  const contractEnd = addMonths(c.signed, c.term_years * 12);
-  // Installment #1 is the month after signing; the required amount steps up by installment number.
-  const installment = monthsBetween(c.signed, last.month);
-  const required = (c.required_installments.find(t => t.from <= installment && (t.to == null || installment <= t.to))
-    ?? c.required_installments[0]).amount;
-  const extra = last.paid - required;
-  const fixedLeft = monthsBetween(new Date().toISOString(), c.fixed_until);
-
-  document.getElementById("sub").textContent =
-    `Account ${c.account} · ${receipts.length} receipt${receipts.length > 1 ? "s" : ""} · latest ${fmtDate(last.date)}`;
-
-  const principal = sum("principal"), interest = sum("interest"), share = v => (v / (principal + interest) * 100).toFixed(1);
-  document.getElementById("paid").innerHTML = [
-    ["var(--s1)", "เงินต้นที่จ่ายไปแล้ว · Principal paid", principal, `${share(principal)}% of payments · ${(principal / c.loan_total * 100).toFixed(2)}% of the loan`],
-    ["var(--s2)", "ดอกเบี้ยที่จ่ายไปแล้ว · Interest paid", interest, `${share(interest)}% of payments`],
-  ].map(([color, l, v, n]) => `<div class="item" style="border-color:${color}">
-      <div class="label">${l}</div><div class="value">${thb(v, 2)}</div><div class="note">${n}</div></div>`).join("") +
-    `<div class="split" title="Principal ${share(principal)}% · Interest ${share(interest)}%">
-      <div style="flex:${principal};background:var(--s1)"></div><div style="flex:${interest};background:var(--s2)"></div></div>`;
-
-  const tiles = [
-    ["Outstanding balance", thb(last.balance),
-      `${thb(paidOff)} paid off · ${(paidOff / c.loan_total * 100).toFixed(2)}% of ${thb(c.loan_total)}`, paidOff / c.loan_total],
-    ["Total paid", thb(sum("paid")), `${thb(sum("interest"), 2)} of it interest`],
-    [`Paid in ${monthLabel(last.month)}`, thb(last.paid),
-      `installment #${installment} · required ${thb(required)} · ${extra >= 0 ? "extra " + thb(extra) : "short " + thb(-extra)}`],
-    isFinite(months)
-      ? ["Payoff at this pace", fmtDate(payoff, { month: "short", year: "numeric" }),
-          `~${(months / 12).toFixed(1)} yrs vs contract ${contractEnd.getFullYear()} · assumes ${thb(last.paid)}/mo and ${last.rate}% for the whole term`]
-      : ["Payoff at this pace", "—", `${thb(last.paid)}/mo does not cover the interest at ${last.rate}%`],
-    ["Fixed rate until", fmtDate(c.fixed_until, { month: "short", year: "numeric" }),
-      fixedLeft > 0 ? `${c.fixed_rate}% for ${fixedLeft} more months, then ${c.rate_after}` : `now ${c.rate_after}`],
-  ];
-  document.getElementById("tiles").innerHTML = tiles.map(([l, v, n, m]) => `
-    <div class="card tile"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${n}</div>
-    ${m !== undefined ? `<div class="meter"><div style="width:${Math.max(m * 100, 0.5)}%"></div></div>` : ""}</div>`).join("");
-
-  document.getElementById("facts").innerHTML = [
-    ["Signed", fmtDate(c.signed)],
-    ["Loan", `${thb(c.loan_total)} (home ${thb(c.loan_home)} + fire insurance ${thb(c.loan_fire_insurance)})`],
-    ["Term", `${c.term_years} years`],
-    ["Rate", `${c.fixed_rate}% fixed until ${fmtDate(c.fixed_until, { month: "short", year: "numeric" })}, then ${c.rate_after}`],
-    ["Required installment", c.required_installments.map(i => `${thb(i.amount)} (#${i.from}${i.to ? "–" + i.to : "+"})`).join(", ")],
-  ].map(([k, v]) => `<div>${k}: <b>${v}</b></div>`).join("");
-
-  // Fees and insurance have been zero so far; only show the Other column once one turns up.
-  const hasOther = receipts.some(r => r.other);
-  document.getElementById("legend-other").hidden = !hasOther;
-  document.getElementById("table").innerHTML =
-    `<tr><th>Date</th><th>Receipt no.</th><th>Paid</th><th>Principal</th><th>Interest</th>${hasOther ? "<th>Other</th>" : ""}<th>Balance</th><th>Rate</th></tr>` +
-    [...receipts].reverse().map(r => `<tr><td>${fmtDate(r.date)}</td><td>${r.no}</td><td>${thb(r.paid, 2)}</td>
-      <td>${thb(r.principal, 2)}</td><td>${thb(r.interest, 2)}</td>${hasOther ? `<td>${thb(r.other, 2)}</td>` : ""}
-      <td>${thb(r.balance, 2)}</td><td>${r.rate}%</td></tr>`).join("");
-
-  drawBars(rows);
-  drawLine(rows, c.loan_total);
-}
-
-fetch("data.json").then(r => r.json()).then(render).catch(e => {
+labels();
+document.getElementById("print").addEventListener("click", () => print());
+fetch("data.json").then(r => r.json()).then(data => {
+  render(data);
+  document.getElementById("lang").addEventListener("click", () => {
+    lang = lang === "th" ? "en" : "th";
+    localStorage.setItem("lang", lang);
+    render(data);
+  });
+}).catch(e => {
   document.getElementById("sub").innerHTML = `<span class="err">Could not load data.json. Run <code>.venv/bin/python extract.py</code> and serve with <code>python3 -m http.server</code>. (${e.message})</span>`;
 });
 </script>
