@@ -23,7 +23,8 @@ fi
 
 summary=$(.venv/bin/python -c '
 import json; d = json.load(open("data.json")); r = d["receipts"]; last = r[-1]
-print(last["month"], len(r), f"{last[\"balance\"]:,.2f}", f"{sum(x[\"principal\"] for x in r):,.2f}", f"{sum(x[\"interest\"] for x in r):,.2f}")')
+total = lambda k: sum(x[k] for x in r)
+print(last["month"], len(r), format(last["balance"], ",.2f"), format(total("principal"), ",.2f"), format(total("interest"), ",.2f"))')
 read -r month count balance principal interest <<< "$summary"
 
 git add data.json
